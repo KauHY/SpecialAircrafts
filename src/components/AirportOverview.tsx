@@ -30,7 +30,7 @@ export function AirportOverview({ snapshot }: AirportOverviewProps) {
           <ClockIcon />
           <span>数据更新</span>
           <strong>{snapshot.lastUpdated}</strong>
-          <em>示例数据</em>
+          <em>{snapshot.dataMode === 'cached' ? '缓存快照' : '机场本地日程'}</em>
         </div>
         <div className="stat">
           <WindIcon />

@@ -1,10 +1,18 @@
 import { config } from '../config.mjs'
+import { adsbLolProvider } from '../providers/adsblol.mjs'
+import { aeroDataBoxProvider } from '../providers/aerodatabox.mjs'
 import { flightAwareProvider } from '../providers/flightaware.mjs'
 import { flightradar24Provider } from '../providers/flightradar24.mjs'
 import { variFlightProvider } from '../providers/variflight.mjs'
 import { classifyFlights } from './specialFlightRules.mjs'
 
-const providers = [variFlightProvider, flightAwareProvider, flightradar24Provider]
+const commercialProviders = [variFlightProvider, flightAwareProvider, flightradar24Provider]
+const scheduleProviders = [
+  aeroDataBoxProvider,
+  ...(config.enableCommercialProviders ? commercialProviders : []),
+]
+const enrichmentProviders = [adsbLolProvider]
+const providers = [...scheduleProviders, ...enrichmentProviders]
 const cache = new Map()
 
 const normalizeIdentity = (value = '') => value.toLocaleUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -98,6 +106,8 @@ function mergeFlights(records, airport, date) {
 }
 
 const sourceLabels = {
+  aerodatabox: 'AeroDataBox',
+  adsblol: 'ADSB.lol',
   variflight: '飞常准',
   flightaware: 'FlightAware',
   flightradar24: 'Flightradar24',
@@ -145,15 +155,23 @@ export function getProviderConfiguration() {
     id: provider.id,
     label: provider.label,
     configured: provider.isConfigured(),
+    role: enrichmentProviders.includes(provider) ? 'enrichment' : 'schedule',
+    ...(provider.getUsage ? { quota: provider.getUsage() } : {}),
   }))
 }
 
 export async function aggregateAirportSnapshot(airport, date, bypassCache = false) {
   const cacheKey = `${airport.iata || airport.icao}-${date}`
   const cached = cache.get(cacheKey)
-  if (!bypassCache && cached && cached.expiresAt > Date.now()) return cached.value
+  if (!bypassCache && cached && cached.expiresAt > Date.now()) {
+    return {
+      ...cached.value,
+      dataMode: 'cached',
+      notice: `正在展示 ${Math.round(config.cacheTtlMs / 3_600_000)} 小时缓存内的当日计划快照，不会重复消耗免费 API 额度。`,
+    }
+  }
 
-  const enabledProviders = providers.filter((provider) => provider.isConfigured())
+  const enabledProviders = scheduleProviders.filter((provider) => provider.isConfigured())
   if (enabledProviders.length === 0) {
     return {
       airport,
@@ -162,8 +180,12 @@ export async function aggregateAirportSnapshot(airport, date, bypassCache = fals
       weather: { temperature: null, condition: '暂无实时天气', windDirection: '', windSpeed: null, visibility: null, runwayHint: '等待数据源' },
       flights: [],
       dataMode: 'unavailable',
-      providers: getProviderConfiguration().map((provider) => ({ ...provider, ok: false, recordCount: 0 })),
-      notice: '尚未配置航班数据 API。请复制 .env.example 为 .env 并填入至少一个供应商密钥。',
+      providers: getProviderConfiguration().map((provider) => ({
+        ...provider,
+        ok: provider.role === 'enrichment' && provider.configured,
+        recordCount: 0,
+      })),
+      notice: '尚未配置计划航班数据源。推荐申请 AeroDataBox RapidAPI 免费档，并在 .env 中填写 AERODATABOX_RAPIDAPI_KEY。',
     }
   }
 
@@ -193,16 +215,51 @@ export async function aggregateAirportSnapshot(airport, date, bypassCache = fals
 
   const successful = providerResults.filter((provider) => provider.configured && provider.ok)
   const merged = mergeFlights(allRecords, airport, date)
+  const preliminaryCandidates = classifyFlights(merged, airport, date, false)
+  const adsbStatus = providerResults.find((provider) => provider.id === adsbLolProvider.id)
+  if (adsbLolProvider.isConfigured()) {
+    const enrichment = await adsbLolProvider.enrichFlights(preliminaryCandidates)
+    for (const { flight, result } of enrichment.updates) {
+      const target = merged.find((item) => (
+        item.provider === flight.provider
+        && item.providerId === flight.providerId
+      ))
+      if (!target) continue
+      target.registration ||= result.registration
+      target.aircraftType ||= result.aircraftType
+      target.callsign ||= result.callsign
+      target.latitude = result.latitude ?? target.latitude
+      target.longitude = result.longitude ?? target.longitude
+      target.updatedAt = result.updatedAt || target.updatedAt
+      target.sources = [...new Set([...target.sources, adsbLolProvider.id])]
+    }
+    Object.assign(adsbStatus, {
+      ok: enrichment.attempted === 0 || enrichment.updates.length > 0 || enrichment.errors.length === 0,
+      recordCount: enrichment.updates.length,
+      ...(enrichment.errors.length && enrichment.updates.length === 0 ? { error: enrichment.errors[0] } : {}),
+    })
+  }
+
   const classified = classifyFlights(merged, airport, date, config.includeAllFlights)
     .map((flight) => toClientFlight(flight, airport))
     .sort((left, right) => right.rarityScore - left.rarityScore || left.estimatedTime.localeCompare(right.estimatedTime))
   const weatherText = merged.find((flight) => flight.weatherText)?.weatherText
-  const dataMode = successful.length === enabledProviders.length ? 'live' : successful.length ? 'partial' : 'error'
-  const notice = dataMode === 'live'
-    ? `已从 ${successful.map((item) => item.label).join('、')} 获取数据；注册号可能在飞机起飞后才出现。`
+  const successfulSchedules = successful.filter((provider) => provider.role === 'schedule')
+  const dataMode = successfulSchedules.length === enabledProviders.length ? 'fresh' : successfulSchedules.length ? 'partial' : 'error'
+  const notice = dataMode === 'fresh'
+    ? `已生成今日低频计划快照，来源：${successfulSchedules.map((item) => item.label).join('、')}；注册号可能在飞机起飞后才出现。`
     : dataMode === 'partial'
       ? '部分数据源请求失败，当前结果可能不完整。'
       : '已配置的数据源均请求失败，请检查密钥、IP 白名单和接口额度。'
+
+  if (dataMode === 'error' && cached && cached.staleUntil > Date.now()) {
+    return {
+      ...cached.value,
+      dataMode: 'cached',
+      providers: providerResults,
+      notice: '本次免费数据源请求失败，正在展示 24 小时容错期内的上一份快照。',
+    }
+  }
 
   const snapshot = {
     airport,
@@ -221,7 +278,13 @@ export async function aggregateAirportSnapshot(airport, date, bypassCache = fals
     providers: providerResults,
     notice,
   }
-  cache.set(cacheKey, { value: snapshot, expiresAt: Date.now() + config.cacheTtlMs })
+  if (successfulSchedules.length) {
+    cache.set(cacheKey, {
+      value: snapshot,
+      expiresAt: Date.now() + config.cacheTtlMs,
+      staleUntil: Date.now() + config.staleCacheTtlMs,
+    })
+  }
   return snapshot
 }
 
@@ -233,4 +296,3 @@ export function getAirportLocalDate(airport) {
     day: '2-digit',
   }).format(new Date())
 }
-

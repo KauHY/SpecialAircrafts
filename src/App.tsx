@@ -65,7 +65,7 @@ function App() {
           <a className="active" href="#discover">今日发现</a>
           <a href="#about">项目说明</a>
         </nav>
-        <span className="mvp-badge">MVP · 多源聚合</span>
+        <span className="mvp-badge">MVP · 免费数据优先</span>
       </header>
 
       <main id="top">
@@ -80,13 +80,18 @@ function App() {
 
               <section className={`data-status ${snapshot.dataMode}`} aria-label="数据源状态">
                 <div>
-                  <strong>{snapshot.dataMode === 'live' ? '实时数据已连接' : snapshot.dataMode === 'partial' ? '部分数据可用' : snapshot.dataMode === 'error' ? '数据源请求失败' : '等待配置真实数据源'}</strong>
+                  <strong>{snapshot.dataMode === 'fresh' ? '今日计划快照已生成' : snapshot.dataMode === 'cached' ? '正在使用额度友好缓存' : snapshot.dataMode === 'partial' ? '部分数据可用' : snapshot.dataMode === 'error' ? '数据源请求失败' : '等待配置计划数据源'}</strong>
                   <p>{snapshot.notice}</p>
                 </div>
                 <div className="provider-list">
                   {snapshot.providers.map((provider) => (
-                    <span key={provider.id} className={provider.ok ? 'ok' : provider.configured ? 'failed' : ''} title={provider.error}>
-                      <i />{provider.label}{provider.ok ? ` · ${provider.recordCount}` : provider.configured ? ' · 异常' : ' · 未配置'}
+                    <span
+                      key={provider.id}
+                      className={provider.ok ? 'ok' : provider.configured ? 'failed' : ''}
+                      title={provider.error || (provider.quota ? `本月本地预算 ${provider.quota.used}/${provider.quota.budget} units` : undefined)}
+                    >
+                      <i />{provider.label}{provider.ok ? ` · ${provider.recordCount}` : provider.configured ? ' · 异常' : ' · 可选'}
+                      {provider.quota ? ` · ${provider.quota.used}/${provider.quota.budget}u` : ''}
                     </span>
                   ))}
                 </div>
@@ -121,8 +126,8 @@ function App() {
                 ) : (
                   <div className="empty-state">
                     <PlaneIcon />
-                    <h3>{snapshot.dataMode === 'unavailable' ? '尚未连接真实航班数据' : '当前分类暂无特别飞机'}</h3>
-                    <p>{snapshot.dataMode === 'unavailable' ? '按照 .env.example 配置至少一个官方 API 后重新启动。' : '试试其他分类，或稍后刷新机场动态。'}</p>
+                    <h3>{snapshot.dataMode === 'unavailable' ? '尚未连接计划航班数据' : '当前分类暂无特别飞机'}</h3>
+                    <p>{snapshot.dataMode === 'unavailable' ? '按照 .env.example 配置 AeroDataBox 免费密钥后重新启动。' : '试试其他分类，或等待下一次低频快照更新。'}</p>
                   </div>
                 )}
               </section>
@@ -135,7 +140,7 @@ function App() {
             <span className="eyebrow">ABOUT THE MVP</span>
             <h2>从“查航班”到“发现值得等的飞机”</h2>
           </div>
-          <p>当前版本已加入后端聚合层，可连接飞常准、FlightAware 与 Flightradar24，并对来源、更新时间和数据可信度进行标注。</p>
+          <p>当前版本采用 AeroDataBox 免费计划航班作为主源，以 12 小时快照和本地额度预算控制调用量；ADSB.lol 只对少量候选飞机做开放数据补充，原有商业接口仍可按需启用。</p>
         </section>
       </main>
 

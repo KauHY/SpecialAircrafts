@@ -2,7 +2,7 @@ export type SpecialCategory = 'rare-airline' | 'special-livery' | 'rare-type' | 
 
 export type FlightStatus = 'approaching' | 'scheduled' | 'landed' | 'delayed' | 'cancelled'
 
-export type DataMode = 'live' | 'partial' | 'unavailable' | 'error'
+export type DataMode = 'fresh' | 'cached' | 'partial' | 'unavailable' | 'error'
 export type DataQuality = 'high' | 'medium' | 'low'
 
 export interface Airport {
@@ -29,6 +29,13 @@ export interface ProviderStatus {
   configured: boolean
   ok: boolean
   recordCount: number
+  role: 'schedule' | 'enrichment'
+  quota?: {
+    used: number
+    budget: number
+    remaining: number
+    resetsAt: string
+  }
   error?: string
 }
 

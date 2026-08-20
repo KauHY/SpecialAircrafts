@@ -159,6 +159,7 @@ button { cursor: pointer; }
   border-radius: 5px;
 }
 .data-status.partial { background: #fff7e8; border-color: #ead8ae; }
+.data-status.cached { background: #eef3f8; border-color: #cdd9e4; }
 .data-status.unavailable, .data-status.error { background: #fff1ed; border-color: #e8c9bf; }
 .data-status strong { font-size: 12px; }
 .data-status p { margin: 4px 0 0; color: #667683; font-size: 10px; }
