@@ -87,10 +87,10 @@ function App() {
                   {snapshot.providers.map((provider) => (
                     <span
                       key={provider.id}
-                      className={provider.ok ? 'ok' : provider.configured ? 'failed' : ''}
-                      title={provider.error || (provider.quota ? `本月本地预算 ${provider.quota.used}/${provider.quota.budget} units` : undefined)}
+                      className={provider.ok ? 'ok' : provider.configured && !provider.skipped ? 'failed' : ''}
+                      title={provider.error || provider.mode || (provider.quota ? `本月本地预算 ${provider.quota.used}/${provider.quota.budget} units` : undefined)}
                     >
-                      <i />{provider.label}{provider.ok ? ` · ${provider.recordCount}` : provider.configured ? ' · 异常' : ' · 可选'}
+                      <i />{provider.label}{provider.ok ? ` · ${provider.recordCount}` : provider.skipped ? ' · 后备待命' : provider.configured ? ' · 异常' : ' · 可选'}
                       {provider.quota ? ` · ${provider.quota.used}/${provider.quota.budget}u` : ''}
                     </span>
                   ))}
@@ -140,7 +140,7 @@ function App() {
             <span className="eyebrow">ABOUT THE MVP</span>
             <h2>从“查航班”到“发现值得等的飞机”</h2>
           </div>
-          <p>当前版本采用 AeroDataBox 免费计划航班作为主源，以 12 小时快照和本地额度预算控制调用量；ADSB.lol 只对少量候选飞机做开放数据补充，原有商业接口仍可按需启用。</p>
+          <p>当前版本由机场计划源发现航班，飞常准 Aviation MCP 优先校验特别候选并覆盖有效字段；12 小时快照控制调用量，ADSB.lol 继续补全缺失的注册号与机型。</p>
         </section>
       </main>
 

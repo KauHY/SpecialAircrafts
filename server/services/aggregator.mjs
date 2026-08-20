@@ -3,17 +3,19 @@ import { adsbLolProvider } from '../providers/adsblol.mjs'
 import { aeroDataBoxProvider } from '../providers/aerodatabox.mjs'
 import { flightAwareProvider } from '../providers/flightaware.mjs'
 import { flightradar24Provider } from '../providers/flightradar24.mjs'
-import { variFlightProvider } from '../providers/variflight.mjs'
+import { variFlightMcpProvider, variFlightProvider } from '../providers/variflight.mjs'
 import { classifyFlights } from './specialFlightRules.mjs'
 
-const commercialProviders = [variFlightProvider, flightAwareProvider, flightradar24Provider]
+const commercialProviders = [flightAwareProvider, flightradar24Provider]
 const scheduleProviders = [
+  variFlightProvider,
   aeroDataBoxProvider,
   ...(config.enableCommercialProviders ? commercialProviders : []),
 ]
-const enrichmentProviders = [adsbLolProvider]
-const providers = [...scheduleProviders, ...enrichmentProviders]
+const enrichmentProviders = [variFlightMcpProvider, adsbLolProvider]
+const providers = [variFlightMcpProvider, ...scheduleProviders, adsbLolProvider]
 const cache = new Map()
+const inFlight = new Map()
 
 const normalizeIdentity = (value = '') => value.toLocaleUpperCase().replace(/[^A-Z0-9]/g, '')
 
@@ -156,11 +158,12 @@ export function getProviderConfiguration() {
     label: provider.label,
     configured: provider.isConfigured(),
     role: enrichmentProviders.includes(provider) ? 'enrichment' : 'schedule',
+    ...(provider.getMode ? { mode: provider.getMode() } : {}),
     ...(provider.getUsage ? { quota: provider.getUsage() } : {}),
   }))
 }
 
-export async function aggregateAirportSnapshot(airport, date, bypassCache = false) {
+async function buildAirportSnapshot(airport, date, bypassCache = false) {
   const cacheKey = `${airport.iata || airport.icao}-${date}`
   const cached = cache.get(cacheKey)
   if (!bypassCache && cached && cached.expiresAt > Date.now()) {
@@ -185,37 +188,94 @@ export async function aggregateAirportSnapshot(airport, date, bypassCache = fals
         ok: provider.role === 'enrichment' && provider.configured,
         recordCount: 0,
       })),
-      notice: '尚未配置计划航班数据源。推荐申请 AeroDataBox RapidAPI 免费档，并在 .env 中填写 AERODATABOX_RAPIDAPI_KEY。',
+      notice: '尚未配置计划航班数据源。可优先填写 VARIFLIGHT_API_KEY，或使用 AERODATABOX_RAPIDAPI_KEY 作为后备。',
     }
   }
 
-  const settled = await Promise.allSettled(
-    enabledProviders.map(async (provider) => ({
-      provider,
-      records: await provider.fetchArrivals({ airport, date }),
-    })),
-  )
   const allRecords = []
-  const providerResults = getProviderConfiguration().map((provider) => ({ ...provider, ok: false, recordCount: 0 }))
+  const providerResults = getProviderConfiguration().map((provider) => ({
+    ...provider,
+    ok: false,
+    recordCount: 0,
+    skipped: false,
+  }))
 
-  settled.forEach((result, index) => {
-    const provider = enabledProviders[index]
+  const recordSuccess = (provider, records) => {
     const status = providerResults.find((item) => item.id === provider.id)
-    if (result.status === 'fulfilled') {
-      allRecords.push(...result.value.records)
-      Object.assign(status, { ok: true, recordCount: result.value.records.length })
-    } else {
-      Object.assign(status, {
-        ok: false,
-        recordCount: 0,
-        error: result.reason instanceof Error ? result.reason.message : '未知错误',
-      })
+    allRecords.push(...records)
+    Object.assign(status, { ok: true, recordCount: records.length })
+  }
+  const recordFailure = (provider, error) => {
+    const status = providerResults.find((item) => item.id === provider.id)
+    Object.assign(status, {
+      ok: false,
+      recordCount: 0,
+      error: error instanceof Error ? error.message : '未知错误',
+    })
+  }
+
+  if (config.providerStrategy === 'priority') {
+    let resolved = false
+    for (const provider of enabledProviders) {
+      if (resolved) {
+        const status = providerResults.find((item) => item.id === provider.id)
+        Object.assign(status, { skipped: true })
+        continue
+      }
+      try {
+        const records = await provider.fetchArrivals({ airport, date })
+        recordSuccess(provider, records)
+        resolved = records.length > 0
+      } catch (error) {
+        recordFailure(provider, error)
+      }
     }
-  })
+  } else {
+    const settled = await Promise.allSettled(
+      enabledProviders.map((provider) => provider.fetchArrivals({ airport, date })),
+    )
+    settled.forEach((result, index) => {
+      const provider = enabledProviders[index]
+      if (result.status === 'fulfilled') recordSuccess(provider, result.value)
+      else recordFailure(provider, result.reason)
+    })
+  }
 
   const successful = providerResults.filter((provider) => provider.configured && provider.ok)
   const merged = mergeFlights(allRecords, airport, date)
-  const preliminaryCandidates = classifyFlights(merged, airport, date, false)
+  let preliminaryCandidates = classifyFlights(merged, airport, date, false)
+  const variFlightMcpStatus = providerResults.find((provider) => provider.id === variFlightMcpProvider.id)
+  if (variFlightMcpProvider.isConfigured()) {
+    const enrichment = await variFlightMcpProvider.enrichFlights(preliminaryCandidates, date, airport)
+    for (const { flight, result } of enrichment.updates) {
+      const target = merged.find((item) => item.provider === flight.provider && item.providerId === flight.providerId)
+      if (!target) continue
+      target.callsign = result.callsign || target.callsign
+      target.airlineCode = result.airlineCode || target.airlineCode
+      target.airline = result.airline || target.airline
+      target.aircraftType = result.aircraftType || target.aircraftType
+      target.aircraftName = result.aircraftName || target.aircraftName
+      target.registration = result.registration || target.registration
+      target.originCode = result.originCode || target.originCode
+      target.originCity = result.originCity || target.originCity
+      target.destinationCode = result.destinationCode || target.destinationCode
+      target.scheduledTime = result.scheduledTime || target.scheduledTime
+      target.estimatedTime = result.estimatedTime || target.estimatedTime
+      target.actualTime = result.actualTime || target.actualTime
+      target.terminal = result.terminal || target.terminal
+      target.status = result.status !== 'scheduled' ? result.status : target.status
+      target.weatherText = result.weatherText || target.weatherText
+      target.updatedAt = result.updatedAt || target.updatedAt
+      target.sources = [variFlightMcpProvider.id, ...target.sources.filter((source) => source !== variFlightMcpProvider.id)]
+    }
+    Object.assign(variFlightMcpStatus, {
+      ok: enrichment.attempted === 0 || enrichment.updates.length > 0 || enrichment.errors.length === 0,
+      recordCount: enrichment.updates.length,
+      ...(enrichment.errors.length && enrichment.updates.length === 0 ? { error: enrichment.errors[0] } : {}),
+    })
+    preliminaryCandidates = classifyFlights(merged, airport, date, false)
+  }
+
   const adsbStatus = providerResults.find((provider) => provider.id === adsbLolProvider.id)
   if (adsbLolProvider.isConfigured()) {
     const enrichment = await adsbLolProvider.enrichFlights(preliminaryCandidates)
@@ -245,12 +305,15 @@ export async function aggregateAirportSnapshot(airport, date, bypassCache = fals
     .sort((left, right) => right.rarityScore - left.rarityScore || left.estimatedTime.localeCompare(right.estimatedTime))
   const weatherText = merged.find((flight) => flight.weatherText)?.weatherText
   const successfulSchedules = successful.filter((provider) => provider.role === 'schedule')
-  const dataMode = successfulSchedules.length === enabledProviders.length ? 'fresh' : successfulSchedules.length ? 'partial' : 'error'
+  const attemptedSchedules = providerResults.filter((provider) => provider.role === 'schedule' && provider.configured && !provider.skipped)
+  const failedSchedules = attemptedSchedules.filter((provider) => !provider.ok)
+  const dataMode = !successfulSchedules.length ? 'error' : failedSchedules.length ? 'partial' : 'fresh'
+  const firstScheduleError = providerResults.find((provider) => provider.role === 'schedule' && provider.configured && provider.error)?.error
   const notice = dataMode === 'fresh'
     ? `已生成今日低频计划快照，来源：${successfulSchedules.map((item) => item.label).join('、')}；注册号可能在飞机起飞后才出现。`
     : dataMode === 'partial'
-      ? '部分数据源请求失败，当前结果可能不完整。'
-      : '已配置的数据源均请求失败，请检查密钥、IP 白名单和接口额度。'
+      ? `已由 ${successfulSchedules.map((item) => item.label).join('、')} 后备生成快照；更高顺位数据源失败：${firstScheduleError}`
+      : `计划数据源请求失败：${firstScheduleError || '请检查密钥、订阅状态和接口额度。'}`
 
   if (dataMode === 'error' && cached && cached.staleUntil > Date.now()) {
     return {
@@ -286,6 +349,20 @@ export async function aggregateAirportSnapshot(airport, date, bypassCache = fals
     })
   }
   return snapshot
+}
+
+export async function aggregateAirportSnapshot(airport, date, bypassCache = false) {
+  const cacheKey = `${airport.iata || airport.icao}-${date}`
+  const pending = inFlight.get(cacheKey)
+  if (pending) return pending
+
+  const task = buildAirportSnapshot(airport, date, bypassCache)
+  inFlight.set(cacheKey, task)
+  try {
+    return await task
+  } finally {
+    if (inFlight.get(cacheKey) === task) inFlight.delete(cacheKey)
+  }
 }
 
 export function getAirportLocalDate(airport) {

@@ -2,7 +2,9 @@ import { config } from '../config.mjs'
 import { getQuotaUsage, reserveQuotaUnits } from '../services/quotaLedger.mjs'
 import { fetchJson, ProviderError } from './http.mjs'
 
-const requestSpacingMs = 1_050
+// The free plan is documented as 1 req/s. A wider margin avoids boundary
+// rounding at RapidAPI and the upstream provider.
+const requestSpacingMs = 1_500
 let requestQueue = Promise.resolve()
 let nextRequestAt = 0
 
@@ -101,6 +103,20 @@ function enqueueRequest(url) {
   return scheduled
 }
 
+async function fetchWindow(url) {
+  try {
+    return await enqueueRequest(url)
+  } catch (error) {
+    const retryable = !error?.status || error.status === 429 || error.status >= 500
+    if (!retryable) throw error
+
+    // A single retry covers transient DNS/TLS failures and rate-limit boundary
+    // responses without turning an upstream outage into an unbounded loop.
+    await wait(error.status === 429 ? 3_000 : 1_500)
+    return enqueueRequest(url)
+  }
+}
+
 export const aeroDataBoxProvider = {
   id: 'aerodatabox',
   label: 'AeroDataBox 免费档',
@@ -128,7 +144,7 @@ export const aeroDataBoxProvider = {
       url.searchParams.set('withPrivate', 'true')
       url.searchParams.set('withLocation', 'false')
 
-      const payload = await enqueueRequest(url)
+      const payload = await fetchWindow(url)
       const arrivals = Array.isArray(payload?.arrivals) ? payload.arrivals : []
       flights.push(...arrivals)
     }
@@ -136,4 +152,3 @@ export const aeroDataBoxProvider = {
     return flights.map((flight, index) => mapFlight(flight, airportCode, index))
   },
 }
-

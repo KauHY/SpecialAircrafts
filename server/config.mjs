@@ -12,12 +12,17 @@ const nonNegativeNumber = (value, fallback) => {
 
 const enabledUnlessFalse = (value) => `${value ?? 'true'}`.toLocaleLowerCase() !== 'false'
 
+const explicitVariFlightApiKey = (process.env.VARIFLIGHT_API_KEY || process.env.X_VARIFLIGHT_KEY || '').trim()
+const legacyVariFlightSecurity = process.env.VARIFLIGHT_APP_SECURITY?.trim() ?? ''
+const compatibleVariFlightApiKey = /^sk-/i.test(legacyVariFlightSecurity) ? legacyVariFlightSecurity : ''
+
 export const config = {
   port: positiveNumber(process.env.PORT, 8787),
   cacheTtlMs: positiveNumber(process.env.CACHE_TTL_SECONDS, 43_200) * 1000,
   staleCacheTtlMs: positiveNumber(process.env.STALE_CACHE_TTL_SECONDS, 86_400) * 1000,
   providerTimeoutMs: positiveNumber(process.env.PROVIDER_TIMEOUT_MS, 10_000),
   includeAllFlights: process.env.INCLUDE_ALL_FLIGHTS === 'true',
+  providerStrategy: process.env.PROVIDER_STRATEGY === 'aggregate' ? 'aggregate' : 'priority',
   enableCommercialProviders: process.env.ENABLE_COMMERCIAL_PROVIDERS === 'true',
   aeroDataBox: {
     apiKey: process.env.AERODATABOX_RAPIDAPI_KEY?.trim() ?? '',
@@ -41,8 +46,18 @@ export const config = {
     baseUrl: (process.env.FR24_BASE_URL || 'https://fr24api.flightradar24.com/api').replace(/\/$/, ''),
   },
   variFlight: {
+    apiKey: explicitVariFlightApiKey || compatibleVariFlightApiKey,
+    apiKeySource: explicitVariFlightApiKey ? 'VARIFLIGHT_API_KEY' : compatibleVariFlightApiKey ? '兼容旧变量' : '',
+    mcpBaseUrl: (process.env.VARIFLIGHT_MCP_BASE_URL || 'https://mcp.variflight.com/api/v1/mcp/data').replace(/\/$/, ''),
+    mcpCacheTtlMs: positiveNumber(process.env.VARIFLIGHT_MCP_CACHE_TTL_SECONDS, 43_200) * 1000,
+    mcpMaxEnrichmentRequests: nonNegativeNumber(process.env.VARIFLIGHT_MCP_MAX_ENRICHMENT_REQUESTS, 4),
     appId: process.env.VARIFLIGHT_APP_ID?.trim() ?? '',
-    appSecurity: process.env.VARIFLIGHT_APP_SECURITY?.trim() ?? '',
-    baseUrl: process.env.VARIFLIGHT_BASE_URL || 'https://open-al.variflight.com/api/flight',
+    appSecurity: legacyVariFlightSecurity,
+    legacyConfigured: Boolean(
+      process.env.VARIFLIGHT_APP_ID?.trim()
+      && legacyVariFlightSecurity
+      && !compatibleVariFlightApiKey
+    ),
+    legacyBaseUrl: process.env.VARIFLIGHT_BASE_URL || 'https://open-al.variflight.com/api/flight',
   },
 }

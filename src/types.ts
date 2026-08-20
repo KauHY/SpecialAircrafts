@@ -30,6 +30,8 @@ export interface ProviderStatus {
   ok: boolean
   recordCount: number
   role: 'schedule' | 'enrichment'
+  mode?: string
+  skipped?: boolean
   quota?: {
     used: number
     budget: number

@@ -21,7 +21,10 @@ export async function fetchJson(provider, url, options = {}) {
       signal: AbortSignal.timeout(config.providerTimeoutMs),
     })
   } catch (error) {
-    const detail = error instanceof Error ? error.message : '网络请求失败'
+    const cause = error instanceof Error && error.cause instanceof Error
+      ? `；${error.cause.message}${error.cause.code ? ` (${error.cause.code})` : ''}`
+      : ''
+    const detail = error instanceof Error ? `${error.message}${cause}` : '网络请求失败'
     throw new ProviderError(provider, `${provider} 请求失败：${detail}`)
   }
 
@@ -33,4 +36,3 @@ export async function fetchJson(provider, url, options = {}) {
 
   return response.json()
 }
-

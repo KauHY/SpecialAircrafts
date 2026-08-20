@@ -1,6 +1,6 @@
 # 特别飞机查询系统 Web MVP
 
-面向航空爱好者的特别飞机发现工具。系统默认以 AeroDataBox 免费计划航班为主数据源，以 ADSB.lol 开放 ADS-B 数据做候选补充，统一航班号、计划时间、机型和注册号，再由规则引擎识别特殊机型、彩绘机、货机、公务机与低频境外航司候选。飞常准、FlightAware 与 Flightradar24 保留为可选增强源。
+面向航空爱好者的特别飞机发现工具。系统默认以飞常准 Aviation MCP 为第一顺位，以 AeroDataBox 免费计划航班为第二顺位，以 ADSB.lol 开放 ADS-B 数据做候选补充。后端统一航班号、计划时间、机型和注册号，再由规则引擎识别特殊机型、彩绘机、货机、公务机与低频境外航司候选。
 
 > 航班信息可能随机场运行情况变化，请始终以机场和航空公司官方信息为准。
 
@@ -8,8 +8,8 @@
 
 - 接受任意 IATA 三字码或 ICAO 四字码，不再限制为三个机场。
 - 内置 47 个常用机场的中文名称、城市和时区，可按名称模糊搜索。
-- AeroDataBox RapidAPI 免费档覆盖全球机场当日到港计划；ADSB.lol 无需密钥。
-- 飞常准、FlightAware、Flightradar24 可作为可选后备或增强源。
+- 飞常准新版单 API Key 鉴权与旧版 APP ID 签名均受支持，新版优先。
+- 飞常准无数据或请求失败时自动回退 AeroDataBox；ADSB.lol 无需密钥。
 - 多来源航班去重、字段互补、可信度评分与数据源状态展示。
 - 特殊机型、特别涂装、货机、公务机和低频境外航司候选识别。
 - 12 小时机场快照缓存、24 小时失败回退和本地月度额度账本，减少免费额度消耗。
@@ -34,7 +34,7 @@ pnpm install
 copy .env.example .env
 ```
 
-在 `.env` 中填写 AeroDataBox RapidAPI 免费密钥，然后启动前端和后端：
+在 `.env` 中填写飞常准或 AeroDataBox 密钥，然后启动前端和后端：
 
 ```bash
 pnpm dev
@@ -45,9 +45,30 @@ pnpm dev
 
 没有配置计划供应商时，应用仍可启动，但不会展示虚构的“今日航班”，页面会提示数据源尚未配置。
 
-## 推荐的免费数据方案
+## 数据源顺位
 
-### AeroDataBox：当天计划主源
+默认 `PROVIDER_STRATEGY=priority`，查询顺序如下：
+
+1. 如果存在真正的旧版 V3 APP ID 凭据，飞常准可直接提供机场到港列表。
+2. 否则由 AeroDataBox 获取完整机场日程。
+3. 飞常准 Aviation MCP 按航班号优先校验最多 4 个特别候选，其字段覆盖后备来源。
+4. ADSB.lol 继续补全仍缺少注册号或机型的候选。
+5. 启用商业聚合后才考虑 FlightAware 与 FR24。
+
+高顺位计划来源成功返回非空航班表后，低顺位计划来源进入“后备待命”，不会继续消耗额度。需要多源同时聚合时，可显式设置 `PROVIDER_STRATEGY=aggregate`。
+
+### 飞常准 Aviation MCP：第一顺位
+
+在[飞常准 Aviation MCP 页面](https://www.modelscope.cn/mcp/servers/@variflight-ai/variflight-mcp)申请 API Key：
+
+```dotenv
+VARIFLIGHT_API_KEY=你的_API_KEY
+VARIFLIGHT_MCP_BASE_URL=https://mcp.variflight.com/api/v1/mcp/data
+```
+
+后端使用 `X-VARIFLIGHT-KEY` 请求头和 `endpoint=flight`，按航班号校验特别候选。公开 MCP 的路线列表工具要求出发地与到达地，无法单独列出某机场的全部到港，因此机场列表仍需旧 V3 或 AeroDataBox 发现。为控制试用额度，每份快照默认最多校验 4 个候选并缓存 12 小时。若旧 `VARIFLIGHT_APP_SECURITY` 的值以 `sk-` 开头，系统会自动将其识别为新版 MCP Key。
+
+### AeroDataBox：第二顺位
 
 1. 在 [AeroDataBox RapidAPI 页面](https://rapid.aerodatabox.com/pricing)订阅 FREE 计划。
 2. 将 RapidAPI Key 写入 `.env`：
@@ -78,15 +99,6 @@ ADSB_LOL_MAX_ENRICHMENT_REQUESTS=4
 ```dotenv
 ENABLE_COMMERCIAL_PROVIDERS=true
 ```
-
-### 飞常准 VariFlight
-
-```dotenv
-VARIFLIGHT_APP_ID=你的_APP_ID
-VARIFLIGHT_APP_SECURITY=你的注册安全码
-```
-
-飞常准 Flight Status Query V3 同时校验 Token 和服务器出口 IP。生产部署前需要向飞常准申请凭据并配置 IP 白名单。
 
 ### FlightAware AeroAPI v4
 
@@ -128,6 +140,9 @@ pnpm start
 - 普通查询优先返回 12 小时内的机场当日快照，不重复调用上游 API。
 - 上游请求失败时，可返回 24 小时容错期内的上一份内存快照。
 - `refresh=1` 会跳过快照缓存，但仍受本地月度预算保护。
+- 同一机场和日期的并发请求会合并为一次上游任务，避免 React 开发模式重复加载消耗额度。
+- AeroDataBox 的两个请求至少间隔 1.5 秒，为免费档 1 req/s 限制留出边界余量。
+- 对瞬时网络错误、HTTP 429 和上游 5xx，每个 12 小时时段最多自动重试一次。
 - AeroDataBox 的月度账本按 UTC 自然月重置；RapidAPI 实际账期可能不同，应以其控制台为准。
 - `.runtime` 账本只适合单实例 MVP。多实例部署应改用 Redis 或数据库中的原子计数器。
 

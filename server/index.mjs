@@ -62,9 +62,14 @@ app.use((request, response) => {
   response.status(404).json({ error: `未找到接口：${request.method} ${request.path}` })
 })
 
-app.listen(config.port, '127.0.0.1', () => {
+const server = app.listen(config.port, '127.0.0.1')
+
+server.on('listening', () => {
   const configured = getProviderConfiguration().filter((provider) => provider.configured).map((provider) => provider.label)
   console.log(`Special Aircrafts API: http://127.0.0.1:${config.port}`)
   console.log(configured.length ? `已配置数据源：${configured.join('、')}` : '尚未配置真实数据源，请参考 .env.example')
 })
 
+server.on('error', (error) => {
+  console.error(`Special Aircrafts API 启动失败：${error.message}`)
+})
