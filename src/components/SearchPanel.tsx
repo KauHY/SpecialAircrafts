@@ -1,5 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { listSupportedAirports } from '../services/aircraftService'
+import { useState, type FormEvent } from 'react'
 import { MapPinIcon, SearchIcon } from './Icons'
 
 interface SearchPanelProps {
@@ -10,7 +9,10 @@ interface SearchPanelProps {
 
 export function SearchPanel({ busy, error, onSearch }: SearchPanelProps) {
   const [query, setQuery] = useState('')
-  const airports = useMemo(() => listSupportedAirports(), [])
+  const quickAirports = [
+    ['PVG', '上海'], ['PEK', '北京'], ['CAN', '广州'], ['HKG', '香港'],
+    ['NRT', '东京'], ['SIN', '新加坡'], ['LHR', '伦敦'], ['LAX', '洛杉矶'],
+  ]
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -42,12 +44,12 @@ export function SearchPanel({ busy, error, onSearch }: SearchPanelProps) {
         {error && <p className="search-error">{error}</p>}
       </form>
 
-      <div className="quick-airports" aria-label="支持的示例机场">
+      <div className="quick-airports" aria-label="热门机场">
         <span>快速查看</span>
-        {airports.map((airport) => (
-          <button key={airport.iata} onClick={() => onSearch(airport.iata)} disabled={busy}>
-            <strong>{airport.iata}</strong>
-            {airport.city}
+        {quickAirports.map(([iata, city]) => (
+          <button key={iata} onClick={() => onSearch(iata)} disabled={busy}>
+            <strong>{iata}</strong>
+            {city}
           </button>
         ))}
       </div>

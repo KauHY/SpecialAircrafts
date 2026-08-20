@@ -65,7 +65,7 @@ function App() {
           <a className="active" href="#discover">今日发现</a>
           <a href="#about">项目说明</a>
         </nav>
-        <span className="mvp-badge">MVP · 示例数据</span>
+        <span className="mvp-badge">MVP · 多源聚合</span>
       </header>
 
       <main id="top">
@@ -77,6 +77,20 @@ function App() {
           ) : snapshot ? (
             <>
               <AirportOverview snapshot={snapshot} />
+
+              <section className={`data-status ${snapshot.dataMode}`} aria-label="数据源状态">
+                <div>
+                  <strong>{snapshot.dataMode === 'live' ? '实时数据已连接' : snapshot.dataMode === 'partial' ? '部分数据可用' : snapshot.dataMode === 'error' ? '数据源请求失败' : '等待配置真实数据源'}</strong>
+                  <p>{snapshot.notice}</p>
+                </div>
+                <div className="provider-list">
+                  {snapshot.providers.map((provider) => (
+                    <span key={provider.id} className={provider.ok ? 'ok' : provider.configured ? 'failed' : ''} title={provider.error}>
+                      <i />{provider.label}{provider.ok ? ` · ${provider.recordCount}` : provider.configured ? ' · 异常' : ' · 未配置'}
+                    </span>
+                  ))}
+                </div>
+              </section>
 
               <section className="discover-section" aria-labelledby="discover-title">
                 <div className="section-heading">
@@ -107,8 +121,8 @@ function App() {
                 ) : (
                   <div className="empty-state">
                     <PlaneIcon />
-                    <h3>当前分类暂无记录</h3>
-                    <p>试试其他分类，或稍后刷新机场动态。</p>
+                    <h3>{snapshot.dataMode === 'unavailable' ? '尚未连接真实航班数据' : '当前分类暂无特别飞机'}</h3>
+                    <p>{snapshot.dataMode === 'unavailable' ? '按照 .env.example 配置至少一个官方 API 后重新启动。' : '试试其他分类，或稍后刷新机场动态。'}</p>
                   </div>
                 )}
               </section>
@@ -121,7 +135,7 @@ function App() {
             <span className="eyebrow">ABOUT THE MVP</span>
             <h2>从“查航班”到“发现值得等的飞机”</h2>
           </div>
-          <p>当前版本完成机场检索、分类筛选、稀有度展示与航班详情的前端闭环。后续可直接替换数据服务层，接入合规的实时航班及航空器数据。</p>
+          <p>当前版本已加入后端聚合层，可连接飞常准、FlightAware 与 Flightradar24，并对来源、更新时间和数据可信度进行标注。</p>
         </section>
       </main>
 

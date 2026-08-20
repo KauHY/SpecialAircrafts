@@ -51,13 +51,15 @@ export function FlightDrawer({ flight, onClose }: FlightDrawerProps) {
           <div><dt>预计到达</dt><dd>{flight.estimatedTime}</dd></div>
           <div><dt>航班状态</dt><dd>{statusLabels[flight.status]}</dd></div>
           <div><dt>航站区域</dt><dd>{flight.terminal ?? '待确认'}</dd></div>
-          <div><dt>近 30 日到访</dt><dd>{flight.recentVisits} 次</dd></div>
+          <div><dt>近 30 日到访</dt><dd>{flight.recentVisits === null ? '待积累' : `${flight.recentVisits} 次`}</dd></div>
           <div><dt>特别涂装</dt><dd>{flight.livery ?? '常规涂装'}</dd></div>
+          <div><dt>数据来源</dt><dd>{flight.sources.join(' + ')}</dd></div>
+          <div><dt>数据可信度</dt><dd>{flight.confidence}%</dd></div>
         </dl>
 
         <div className="drawer-note">
           <strong>数据说明</strong>
-          <p>当前为 MVP 演示数据。正式版本将标注数据来源、更新时间与航班变更记录。</p>
+          <p>信息由后端聚合并标注来源。注册号、预计时间及实际运行仍可能随航班状态变化。</p>
         </div>
       </aside>
     </div>

@@ -1,23 +1,20 @@
-import { airportSnapshots } from '../data/mockData'
-import type { AirportSnapshot } from '../types'
+import type { Airport, AirportSnapshot } from '../types'
 
-const normalize = (value: string) => value.trim().toLocaleLowerCase()
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-export const listSupportedAirports = () => airportSnapshots.map(({ airport }) => airport)
+async function readJson<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => ({})) as T & { error?: string }
+  if (!response.ok) throw new Error(payload.error || `请求失败（HTTP ${response.status}）`)
+  return payload
+}
 
 export async function getAirportSnapshot(query: string): Promise<AirportSnapshot> {
-  const keyword = normalize(query)
+  const response = await fetch(`${API_BASE_URL}/airports/${encodeURIComponent(query.trim())}/special-flights`)
+  return readJson<AirportSnapshot>(response)
+}
 
-  await new Promise((resolve) => window.setTimeout(resolve, 280))
-
-  const snapshot = airportSnapshots.find(({ airport }) => {
-    const fields = [airport.iata, airport.icao, airport.name, airport.city]
-    return fields.some((field) => normalize(field).includes(keyword))
-  })
-
-  if (!snapshot) {
-    throw new Error('暂未找到该机场。MVP 示例目前支持 PVG、HKG 和 PEK。')
-  }
-
-  return snapshot
+export async function searchAirports(query: string): Promise<Airport[]> {
+  const response = await fetch(`${API_BASE_URL}/airports/search?q=${encodeURIComponent(query.trim())}`)
+  const payload = await readJson<{ airports: Airport[] }>(response)
+  return payload.airports
 }

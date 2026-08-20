@@ -13,6 +13,7 @@ const statusLabels: Record<FlightStatus, string> = {
   scheduled: '计划到达',
   landed: '已经落地',
   delayed: '延误',
+  cancelled: '已取消',
 }
 
 interface FlightCardProps {
@@ -62,7 +63,7 @@ export function FlightCard({ flight, onSelect }: FlightCardProps) {
 
       <div className="flight-reason">
         <p>{flight.rarityReason}</p>
-        <span>查看详情 <ChevronIcon /></span>
+        <span>{flight.confidence}% 可信度 <ChevronIcon /></span>
       </div>
     </button>
   )

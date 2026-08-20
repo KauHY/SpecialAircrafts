@@ -144,6 +144,31 @@ button { cursor: pointer; }
 .status.approaching i { background: #2dbb9d; box-shadow: 0 0 0 4px rgba(45,187,157,.12); }
 .status.delayed { color: #c4522c; }
 .status.delayed i { background: var(--orange); }
+.status.cancelled { color: #a63c45; }
+.status.cancelled i { background: #c94b56; }
+
+.data-status {
+  margin-top: 18px;
+  padding: 15px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  background: #edf4f1;
+  border: 1px solid #cde0d9;
+  border-radius: 5px;
+}
+.data-status.partial { background: #fff7e8; border-color: #ead8ae; }
+.data-status.unavailable, .data-status.error { background: #fff1ed; border-color: #e8c9bf; }
+.data-status strong { font-size: 12px; }
+.data-status p { margin: 4px 0 0; color: #667683; font-size: 10px; }
+.provider-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.provider-list span { padding: 5px 8px; color: #7a8791; background: rgba(255,255,255,.7); border: 1px solid rgba(90,110,120,.18); border-radius: 20px; font-size: 9px; white-space: nowrap; }
+.provider-list i { width: 6px; height: 6px; margin-right: 5px; display: inline-block; background: #a6afb5; border-radius: 50%; }
+.provider-list span.ok { color: #246b5c; }
+.provider-list span.ok i { background: #2dbb9d; }
+.provider-list span.failed { color: #a24c36; }
+.provider-list span.failed i { background: #d56447; }
 
 .flight-identity { margin-top: 20px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 13px; }
 .aircraft-mark { width: 43px; height: 43px; display: grid; place-items: center; color: var(--navy); background: #edf0f1; border-radius: 50%; }
@@ -235,6 +260,8 @@ footer p:last-child { margin-left: auto; }
   .airport-code { min-width: 64px; font-size: 34px; }
   .airport-title-block h2 { font-size: 16px; }
   .overview-stats { margin-top: 22px; }
+  .data-status { align-items: flex-start; flex-direction: column; }
+  .provider-list { justify-content: flex-start; }
   .stat { min-height: 100px; padding: 20px 12px 0; }
   .stat:nth-child(3) { padding-left: 0; }
   .stat > svg { display: none; }

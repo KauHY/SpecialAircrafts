@@ -34,14 +34,14 @@ export function AirportOverview({ snapshot }: AirportOverviewProps) {
         </div>
         <div className="stat">
           <WindIcon />
-          <span>{weather.windDirection}</span>
-          <strong>{weather.windSpeed}<small> km/h</small></strong>
+          <span>{weather.windDirection || '风况待接入'}</span>
+          <strong>{weather.windSpeed ?? '--'}<small>{weather.windSpeed !== null ? ' km/h' : ''}</small></strong>
           <em>{weather.runwayHint}</em>
         </div>
         <div className="stat">
           <EyeIcon />
-          <span>{weather.condition} · {weather.temperature}℃</span>
-          <strong>{weather.visibility}<small> km</small></strong>
+          <span>{weather.condition}{weather.temperature !== null ? ` · ${weather.temperature}℃` : ''}</span>
+          <strong>{weather.visibility ?? '--'}<small>{weather.visibility !== null ? ' km' : ''}</small></strong>
           <em>能见度</em>
         </div>
       </div>

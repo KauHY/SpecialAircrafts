@@ -1,6 +1,9 @@
 export type SpecialCategory = 'rare-airline' | 'special-livery' | 'rare-type' | 'charter'
 
-export type FlightStatus = 'approaching' | 'scheduled' | 'landed' | 'delayed'
+export type FlightStatus = 'approaching' | 'scheduled' | 'landed' | 'delayed' | 'cancelled'
+
+export type DataMode = 'live' | 'partial' | 'unavailable' | 'error'
+export type DataQuality = 'high' | 'medium' | 'low'
 
 export interface Airport {
   iata: string
@@ -12,12 +15,21 @@ export interface Airport {
 }
 
 export interface WeatherSummary {
-  temperature: number
+  temperature: number | null
   condition: string
   windDirection: string
-  windSpeed: number
-  visibility: number
+  windSpeed: number | null
+  visibility: number | null
   runwayHint: string
+}
+
+export interface ProviderStatus {
+  id: string
+  label: string
+  configured: boolean
+  ok: boolean
+  recordCount: number
+  error?: string
 }
 
 export interface SpecialFlight {
@@ -40,7 +52,14 @@ export interface SpecialFlight {
   rarityScore: number
   rarityReason: string
   livery?: string
-  recentVisits: number
+  recentVisits: number | null
+  actualTime: string
+  sources: string[]
+  confidence: number
+  dataQuality: DataQuality
+  latitude: number | null
+  longitude: number | null
+  lastUpdated: string
 }
 
 export interface AirportSnapshot {
@@ -49,6 +68,9 @@ export interface AirportSnapshot {
   lastUpdated: string
   weather: WeatherSummary
   flights: SpecialFlight[]
+  dataMode: DataMode
+  providers: ProviderStatus[]
+  notice: string
 }
 
 export type FlightFilter = 'all' | SpecialCategory
