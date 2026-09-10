@@ -6,8 +6,8 @@
 
 ## 功能
 
-- 接受任意 IATA 三字码或 ICAO 四字码，不再限制为三个机场。
-- 内置 47 个常用机场的中文名称、城市和时区，可按名称模糊搜索。
+- 仅支持上海浦东（PVG / ZSPD）与上海虹桥（SHA / ZSSS），页面提供双机场选择与快捷入口。
+- 后端也限制为这两个机场；其他机场代码被拒绝，不会触发供应商查询。航班始发地仍按实际航线展示。
 - 飞常准新版单 API Key 鉴权与旧版 APP ID 签名均受支持，新版优先。
 - 飞常准无数据或请求失败时自动回退 AeroDataBox；ADSB.lol 无需密钥。
 - 多来源航班去重、字段互补、可信度评分与数据源状态展示。
@@ -153,7 +153,7 @@ GET /api/health
 GET /api/airports/search?q=上海
 GET /api/airports/PVG/special-flights
 GET /api/airports/ZSPD/special-flights?date=2026-08-20
-GET /api/airports/LHR/special-flights?refresh=1
+GET /api/airports/SHA/special-flights?refresh=1
 ```
 
 `refresh=1` 会跳过本地快照并消耗新的供应商查询额度，仅建议用于排障或人工校验。

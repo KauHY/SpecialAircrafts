@@ -33,7 +33,7 @@ app.get('/api/airports/search', (request, response) => {
 app.get('/api/airports/:query/special-flights', async (request, response) => {
   const airport = resolveAirport(request.params.query)
   if (!airport) {
-    return response.status(400).json({ error: '请输入有效的机场名称、IATA 三字码或 ICAO 四字码。' })
+    return response.status(400).json({ error: '仅支持上海浦东（PVG / ZSPD）和上海虹桥（SHA / ZSSS），请明确选择其中一个机场。' })
   }
 
   const requestedDate = typeof request.query.date === 'string' ? request.query.date : ''

@@ -22,7 +22,7 @@ html { scroll-behavior: smooth; }
 
 body { margin: 0; min-width: 320px; min-height: 100vh; background: #f1f3f2; }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 button, a { -webkit-tap-highlight-color: transparent; }
 
@@ -88,6 +88,8 @@ button { cursor: pointer; }
 .search-field > svg { flex: 0 0 auto; color: #778797; }
 .search-field input { min-width: 0; flex: 1; color: var(--navy); border: 0; outline: 0; background: transparent; font-size: 15px; }
 .search-field input::placeholder { color: #98a4ae; }
+.search-field select { min-width: 0; flex: 1; padding: 8px 0; color: var(--navy); border: 0; background: transparent; font-size: 15px; }
+.search-field select:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .search-field button { height: 48px; padding: 0 22px; display: flex; align-items: center; gap: 9px; color: #fff; background: var(--orange); border: 0; border-radius: 3px; font-weight: 600; transition: background .2s, transform .2s; }
 .search-field button:hover:not(:disabled) { background: #df5b25; transform: translateY(-1px); }
 .search-field button:disabled { cursor: not-allowed; opacity: .55; }
