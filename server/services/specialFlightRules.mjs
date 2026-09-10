@@ -1,15 +1,17 @@
 import {
   chineseAirlineIcaoCodes,
   rareAircraftTypes,
-  specialLiveries,
 } from '../data/specialRegistry.mjs'
+import { getLiveryCatalog, normalizeRegistration } from './liveryDatabase.mjs'
 
 const isActiveLivery = (entry, date) => {
   if (!entry) return false
+  // A current fleet snapshot cannot prove which livery existed in the past.
+  if (date < entry.observedAt.slice(0, 10)) return false
   return (!entry.validFrom || entry.validFrom <= date) && (!entry.validTo || entry.validTo >= date)
 }
 
-export function classifyFlights(flights, airport, date, includeAll) {
+export function classifyFlights(flights, airport, date, includeAll, specialLiveries = getLiveryCatalog()) {
   const airlineFrequency = new Map()
   for (const flight of flights) {
     const code = flight.airlineCode?.toLocaleUpperCase()
@@ -21,13 +23,13 @@ export function classifyFlights(flights, airport, date, includeAll) {
     const reasons = []
     let score = 0
     const type = flight.aircraftType?.toLocaleUpperCase()
-    const registration = flight.registration?.toLocaleUpperCase()
+    const registration = normalizeRegistration(flight.registration)
     const airlineCode = flight.airlineCode?.toLocaleUpperCase()
     const livery = specialLiveries.get(registration)
 
     if (isActiveLivery(livery, date)) {
       categories.push('special-livery')
-      reasons.push(`注册号 ${registration} 命中特别涂装资料库：${livery.name}`)
+      reasons.push(`注册号 ${registration} 命中特别涂装资料库：${livery.name}（民航休闲小站，资料采集日期 ${livery.observedAt.slice(0, 10)}；实际涂装可能变化）`)
       score = Math.max(score, 95)
     }
 
@@ -68,7 +70,8 @@ export function classifyFlights(flights, airport, date, includeAll) {
       rarityScore: score,
       rarityReason: reasons.join('；') || '尚未命中特别飞机规则',
       livery: isActiveLivery(livery, date) ? livery.name : '',
+      liverySources: isActiveLivery(livery, date) ? livery.sources : [],
+      liveryObservedAt: isActiveLivery(livery, date) ? livery.observedAt : '',
     }
   }).filter((flight) => includeAll || flight.categories.length > 0)
 }
-

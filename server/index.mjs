@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.mjs'
 import { resolveAirport, searchAirports } from './data/airports.mjs'
+import { getLiveryDatabaseStatus } from './services/liveryDatabase.mjs'
 import {
   aggregateAirportSnapshot,
   getAirportLocalDate,
@@ -22,6 +23,7 @@ app.get('/api/health', (_request, response) => {
     ok: true,
     time: new Date().toISOString(),
     providers: getProviderConfiguration(),
+    liveryDatabase: getLiveryDatabaseStatus(),
   })
 })
 

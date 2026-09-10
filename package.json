@@ -9,9 +9,16 @@
     "dev:web": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "start": "node server/index.mjs"
+    "start": "node server/index.mjs",
+    "liveries:collect": "python scripts/collect_xmyzl.py",
+    "liveries:import": "node scripts/import_liveries.mjs",
+    "test:liveries": "python -m unittest discover -s scripts -p test_*.py && node --test server/tests/liveries.test.mjs"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.13.0"
   },
   "dependencies": {
+    "better-sqlite3": "12.9.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "react": "^19.1.1",

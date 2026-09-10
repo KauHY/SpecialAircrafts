@@ -61,6 +61,8 @@ export interface SpecialFlight {
   rarityScore: number
   rarityReason: string
   livery?: string
+  liverySources?: { name: string; url: string; airline: string }[]
+  liveryObservedAt?: string
   recentVisits: number | null
   actualTime: string
   sources: string[]

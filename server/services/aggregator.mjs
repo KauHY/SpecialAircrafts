@@ -142,6 +142,8 @@ const toClientFlight = (flight, airport) => {
     rarityScore: flight.rarityScore,
     rarityReason: flight.rarityReason,
     livery: flight.livery || '',
+    liverySources: flight.liverySources || [],
+    liveryObservedAt: flight.liveryObservedAt || '',
     recentVisits: null,
     sources: flight.sources.map((source) => sourceLabels[source] || source),
     confidence,
@@ -151,6 +153,10 @@ const toClientFlight = (flight, airport) => {
     lastUpdated: flight.updatedAt,
   }
 }
+
+const displayFlights = (records, airport, date) => classifyFlights(records, airport, date, config.includeAllFlights)
+  .map(flight => toClientFlight(flight, airport))
+  .sort((left, right) => right.rarityScore - left.rarityScore || left.estimatedTime.localeCompare(right.estimatedTime))
 
 export function getProviderConfiguration() {
   return providers.map((provider) => ({
@@ -169,6 +175,7 @@ async function buildAirportSnapshot(airport, date, bypassCache = false) {
   if (!bypassCache && cached && cached.expiresAt > Date.now()) {
     return {
       ...cached.value,
+      flights: displayFlights(cached.records, airport, date),
       dataMode: 'cached',
       notice: `正在展示 ${Math.round(config.cacheTtlMs / 3_600_000)} 小时缓存内的当日计划快照，不会重复消耗免费 API 额度。`,
     }
@@ -300,9 +307,7 @@ async function buildAirportSnapshot(airport, date, bypassCache = false) {
     })
   }
 
-  const classified = classifyFlights(merged, airport, date, config.includeAllFlights)
-    .map((flight) => toClientFlight(flight, airport))
-    .sort((left, right) => right.rarityScore - left.rarityScore || left.estimatedTime.localeCompare(right.estimatedTime))
+  const classified = displayFlights(merged, airport, date)
   const weatherText = merged.find((flight) => flight.weatherText)?.weatherText
   const successfulSchedules = successful.filter((provider) => provider.role === 'schedule')
   const attemptedSchedules = providerResults.filter((provider) => provider.role === 'schedule' && provider.configured && !provider.skipped)
@@ -318,6 +323,7 @@ async function buildAirportSnapshot(airport, date, bypassCache = false) {
   if (dataMode === 'error' && cached && cached.staleUntil > Date.now()) {
     return {
       ...cached.value,
+      flights: displayFlights(cached.records, airport, date),
       dataMode: 'cached',
       providers: providerResults,
       notice: '本次免费数据源请求失败，正在展示 24 小时容错期内的上一份快照。',
@@ -344,6 +350,7 @@ async function buildAirportSnapshot(airport, date, bypassCache = false) {
   if (successfulSchedules.length) {
     cache.set(cacheKey, {
       value: snapshot,
+      records: merged,
       expiresAt: Date.now() + config.cacheTtlMs,
       staleUntil: Date.now() + config.staleCacheTtlMs,
     })

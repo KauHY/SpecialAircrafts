@@ -5,6 +5,8 @@ dist/
 .env.*
 !.env.example
 .runtime/
+data/*.sqlite*
+__pycache__/
 *.local
 .DS_Store
 *.tsbuildinfo

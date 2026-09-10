@@ -52,7 +52,7 @@ export function FlightDrawer({ flight, onClose }: FlightDrawerProps) {
           <div><dt>航班状态</dt><dd>{statusLabels[flight.status]}</dd></div>
           <div><dt>航站区域</dt><dd>{flight.terminal ?? '待确认'}</dd></div>
           <div><dt>近 30 日到访</dt><dd>{flight.recentVisits === null ? '待积累' : `${flight.recentVisits} 次`}</dd></div>
-          <div><dt>特别涂装</dt><dd>{flight.livery ?? '常规涂装'}</dd></div>
+          <div><dt>特别涂装</dt><dd>{flight.livery || '未匹配到彩绘资料'}</dd></div>
           <div><dt>数据来源</dt><dd>{flight.sources.join(' + ')}</dd></div>
           <div><dt>数据可信度</dt><dd>{flight.confidence}%</dd></div>
         </dl>
@@ -60,6 +60,10 @@ export function FlightDrawer({ flight, onClose }: FlightDrawerProps) {
         <div className="drawer-note">
           <strong>数据说明</strong>
           <p>信息由后端聚合并标注来源。注册号、预计时间及实际运行仍可能随航班状态变化。</p>
+          {flight.liverySources?.map(source => (
+            <p key={source.url}>彩绘资料：<a href={source.url} target="_blank" rel="noreferrer">{source.name} · {source.airline}</a></p>
+          ))}
+          {flight.liveryObservedAt && <p>资料采集日期：{flight.liveryObservedAt.slice(0, 10)}。涂装可能调整，请以实际飞机为准。</p>}
         </div>
       </aside>
     </div>

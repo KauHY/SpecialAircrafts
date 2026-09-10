@@ -1,8 +1,4 @@
-// 特殊涂装必须以注册号维护，并记录有效期。这里不预置未经核验的数据，
-// 后续可由管理后台或经授权的数据源维护。
-export const specialLiveries = new Map([
-  // ['B-1234', { name: '示例彩绘', validFrom: '2026-01-01', validTo: '2026-12-31' }],
-])
+// 彩绘资料由 services/liveryDatabase.mjs 从 SQLite 读取。
 
 export const rareAircraftTypes = new Map([
   ['A225', 'Antonov An-225'],
@@ -25,4 +21,3 @@ export const chineseAirlineIcaoCodes = new Set([
   'CCA', 'CES', 'CSN', 'CHH', 'CSZ', 'CQH', 'CXA', 'CDG', 'CDC', 'CSC',
   'CSH', 'GCR', 'CHB', 'DKH', 'LKE', 'OKA', 'RLH', 'OTT', 'CUA', 'JOY',
 ])
-
